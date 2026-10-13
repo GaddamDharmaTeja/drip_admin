@@ -47,13 +47,22 @@ export type UploadResult = {
   url: string
 }
 
-/** Absolute URL for GridFS files (works with Vite proxy). */
+/**
+ * Absolute URL for GridFS / API file paths.
+ * On Render, relative `/api/files/...` would hit the static admin host and 404 —
+ * rewrite those to the API origin when VITE_API_URL is set.
+ */
 export function fileUrl(pathOrUrl?: string | null) {
   if (!pathOrUrl) return ''
   if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) return pathOrUrl
-  if (pathOrUrl.startsWith('/api/')) return pathOrUrl
-  if (pathOrUrl.startsWith('/')) return pathOrUrl
-  return `/api/files/${pathOrUrl}`
+
+  const apiRoot = API_BASE.replace(/\/$/, '')
+  const apiOrigin = apiRoot.startsWith('http') ? apiRoot.replace(/\/api$/, '') : ''
+
+  if (pathOrUrl.startsWith('/api/') || pathOrUrl.startsWith('/')) {
+    return apiOrigin ? `${apiOrigin}${pathOrUrl}` : pathOrUrl
+  }
+  return `${apiRoot}/files/${pathOrUrl}`
 }
 
 export async function uploadImage(file: File): Promise<UploadResult> {
