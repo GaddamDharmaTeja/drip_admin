@@ -271,8 +271,10 @@ export type ServiceRequest = {
   email?: string
   phone?: string
   message?: string
+  details?: Record<string, unknown>
   status: string
   createdAt: string
+  updatedAt?: string
 }
 
 export type Quotation = {
