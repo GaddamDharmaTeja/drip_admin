@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --color-forest: #14532d;
+  --color-leaf: #2e7d32;
+  --color-mist: #e8f5e9;
+  --color-soil: #14201a;
+  --color-sand: #eef5ea;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-sans);
+  color: var(--color-soil);
+  background:
+    radial-gradient(900px 420px at 0% 0%, #d7ecd4 0%, transparent 55%),
+    radial-gradient(700px 380px at 100% 0%, #cfe6d4 0%, transparent 50%),
+    var(--color-sand);
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.btn-primary {
+  @apply inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition bg-leaf text-white hover:bg-forest disabled:opacity-60;
+}
+
+.btn-outline {
+  @apply inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition border border-leaf/25 bg-white/90 text-leaf hover:bg-mist disabled:opacity-60;
+}
+
+.btn-danger {
+  @apply inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition bg-red-600 text-white hover:bg-red-700 disabled:opacity-60;
+}
+
+.input {
+  @apply w-full rounded-xl border border-stone-200/90 bg-white px-3 py-2.5 text-sm outline-none focus:border-leaf focus:ring-2 focus:ring-leaf/20;
+}
+
+.label {
+  @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-stone-500;
+}
+
+.card {
+  @apply rounded-2xl border border-white/70 bg-white/90 p-5 shadow-[0_10px_30px_rgba(20,32,26,0.06)] backdrop-blur;
+}
+
+.table-wrap {
+  @apply overflow-x-auto rounded-2xl border border-white/70 bg-white/95 shadow-[0_10px_30px_rgba(20,32,26,0.05)];
+}
+
+.upload-zone {
+  @apply flex min-h-40 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-leaf/30 bg-mist/40 px-4 py-6 transition hover:border-leaf hover:bg-mist/70;
+}
+
+.upload-preview {
+  @apply max-h-48 w-full object-cover;
+}
+
+.page-title {
+  @apply font-display text-3xl tracking-tight text-forest;
+}
+
+.page-sub {
+  @apply mt-1 text-sm text-stone-600;
+}
+
+.thumb {
+  @apply h-11 w-11 rounded-lg object-cover ring-1 ring-leaf/15;
+}
