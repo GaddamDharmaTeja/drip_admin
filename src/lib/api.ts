@@ -179,6 +179,21 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(body),
     }),
+  siteContact: () => request<SiteContact>('/admin/site-contact'),
+  saveSiteContact: (body: Partial<SiteContact>) =>
+    request<SiteContact>('/admin/site-contact', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+}
+
+export type SiteContact = {
+  id: string
+  title: string
+  address: string
+  email: string
+  phone: string
+  hours: string
 }
 
 export type Product = {

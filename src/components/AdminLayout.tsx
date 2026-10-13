@@ -10,6 +10,7 @@ const links = [
   { to: '/projects', label: 'Projects' },
   { to: '/requests', label: 'Requests' },
   { to: '/quotations', label: 'Quotations' },
+  { to: '/site-contact', label: 'Site contact' },
 ]
 
 export function AdminLayout() {

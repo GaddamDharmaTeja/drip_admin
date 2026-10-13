@@ -10,6 +10,7 @@ import { ProjectPlansPage } from './pages/ProjectPlansPage'
 import { ProjectsPage } from './pages/ProjectsPage'
 import { QuotationsPage } from './pages/QuotationsPage'
 import { RequestsPage } from './pages/RequestsPage'
+import { SiteContactPage } from './pages/SiteContactPage'
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
             <Route path="projects" element={<ProjectsPage />} />
             <Route path="requests" element={<RequestsPage />} />
             <Route path="quotations" element={<QuotationsPage />} />
+            <Route path="site-contact" element={<SiteContactPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
