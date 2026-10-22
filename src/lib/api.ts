@@ -1,3 +1,4 @@
+
 const API_BASE = import.meta.env.VITE_API_URL ?? '/api'
 const TOKEN_KEY = 'dripgrow-admin-token'
 
@@ -10,32 +11,47 @@ export function setToken(token: string | null) {
   else localStorage.removeItem(TOKEN_KEY)
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(
+  path: string,
+  init?: RequestInit
+): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(init?.headers as Record<string, string> | undefined),
   }
+
   const token = getToken()
   if (token) headers.Authorization = `Bearer ${token}`
 
-  const res = await fetch(`${API_BASE}${path}`, { ...init, headers })
-  if (res.status === 401) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers,
+  })
+
+  // Treat unauthorized responses as expired sessions.
+  if (res.status === 401 || res.status === 403) {
     setToken(null)
+
     if (!path.includes('/auth/login')) {
       window.location.href = '/login'
     }
   }
+
   if (!res.ok) {
     let message = `Request failed (${res.status})`
+
     try {
       const body = (await res.json()) as { message?: string }
       if (body.message) message = body.message
     } catch {
-      /* ignore */
+      // Ignore non-JSON error responses.
     }
+
     throw new Error(message)
   }
+
   if (res.status === 204) return undefined as T
+
   return res.json() as Promise<T>
 }
 
@@ -49,27 +65,36 @@ export type UploadResult = {
 
 /**
  * Absolute URL for GridFS / API file paths.
- * On Render, relative `/api/files/...` would hit the static admin host and 404 —
- * rewrite those to the API origin when VITE_API_URL is set.
  */
 export function fileUrl(pathOrUrl?: string | null) {
   if (!pathOrUrl) return ''
-  if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) return pathOrUrl
+
+  if (
+    pathOrUrl.startsWith('http://') ||
+    pathOrUrl.startsWith('https://')
+  ) {
+    return pathOrUrl
+  }
 
   const apiRoot = API_BASE.replace(/\/$/, '')
-  const apiOrigin = apiRoot.startsWith('http') ? apiRoot.replace(/\/api$/, '') : ''
+  const apiOrigin = apiRoot.startsWith('http')
+    ? apiRoot.replace(/\/api$/, '')
+    : ''
 
   if (pathOrUrl.startsWith('/api/') || pathOrUrl.startsWith('/')) {
     return apiOrigin ? `${apiOrigin}${pathOrUrl}` : pathOrUrl
   }
+
   return `${apiRoot}/files/${pathOrUrl}`
 }
 
 export async function uploadImage(file: File): Promise<UploadResult> {
   const form = new FormData()
   form.append('file', file)
+
   const headers: Record<string, string> = {}
   const token = getToken()
+
   if (token) headers.Authorization = `Bearer ${token}`
 
   const res = await fetch(`${API_BASE}/admin/uploads`, {
@@ -77,30 +102,76 @@ export async function uploadImage(file: File): Promise<UploadResult> {
     headers,
     body: form,
   })
-  if (res.status === 401) {
+
+  if (res.status === 401 || res.status === 403) {
     setToken(null)
     window.location.href = '/login'
   }
+
   if (!res.ok) {
     let message = `Upload failed (${res.status})`
+
     try {
       const body = (await res.json()) as { message?: string }
       if (body.message) message = body.message
     } catch {
-      /* ignore */
+      // Ignore non-JSON error responses.
     }
+
     throw new Error(message)
   }
+
   return res.json() as Promise<UploadResult>
+}
+
+export type CreateUserPayload = {
+  username: string
+  displayName: string
+  email: string
+  password: string
+  role: string
+}
+
+export type CreatedUser = {
+  id: string
+  username: string
+  email: string
+  role: string
+  displayName: string
+  active: boolean
+  permissions: string[]
 }
 
 export const api = {
   login: (username: string, password: string) =>
-    request<{ token: string; expiresIn: number; username: string }>('/auth/login', {
+    request<{
+      token: string
+      expiresIn: number
+      username: string
+      role: string
+      permissions: string[]
+    }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
     }),
+
+  // NEW: Create user
+  createUser: (userData: CreateUserPayload) =>
+    request<CreatedUser>('/admin/users', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    }),
+
+  staff: () => request<CreatedUser[]>('/admin/users'),
+
+  setStaffActive: (id: string, active: boolean) =>
+    request<CreatedUser>(`/admin/users/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ active }),
+    }),
+
   uploadImage,
+
   dashboard: () =>
     request<{
       products: number
@@ -109,21 +180,47 @@ export const api = {
       openQuotations: number
       outOfStock: number
     }>('/admin/dashboard'),
+
   products: () => request<Product[]>('/admin/products'),
+
   createProduct: (body: Partial<Product>) =>
-    request<Product>('/admin/products', { method: 'POST', body: JSON.stringify(body) }),
-  updateProduct: (id: string, body: Partial<Product>) =>
-    request<Product>(`/admin/products/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
-  deleteProduct: (id: string) =>
-    request<void>(`/admin/products/${id}`, { method: 'DELETE' }),
-  orders: () => request<Order[]>('/admin/orders'),
-  updateOrder: (orderNumber: string, body: { status?: string; adminNotes?: string }) =>
-    request<Order>(`/admin/orders/${encodeURIComponent(orderNumber)}`, {
-      method: 'PATCH',
+    request<Product>('/admin/products', {
+      method: 'POST',
       body: JSON.stringify(body),
     }),
-  irrigationPlans: () => request<IrrigationPlan[]>('/admin/irrigation-plans'),
-  saveIrrigationPlan: (body: Partial<IrrigationPlan>, id?: string) =>
+
+  updateProduct: (id: string, body: Partial<Product>) =>
+    request<Product>(`/admin/products/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  deleteProduct: (id: string) =>
+    request<void>(`/admin/products/${id}`, {
+      method: 'DELETE',
+    }),
+
+  orders: () => request<Order[]>('/admin/orders'),
+
+  updateOrder: (
+    orderNumber: string,
+    body: { status?: string; adminNotes?: string }
+  ) =>
+    request<Order>(
+      `/admin/orders/${encodeURIComponent(orderNumber)}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      }
+    ),
+
+  irrigationPlans: () =>
+    request<IrrigationPlan[]>('/admin/irrigation-plans'),
+
+  saveIrrigationPlan: (
+    body: Partial<IrrigationPlan>,
+    id?: string
+  ) =>
     id
       ? request<IrrigationPlan>(`/admin/irrigation-plans/${id}`, {
           method: 'PUT',
@@ -133,10 +230,19 @@ export const api = {
           method: 'POST',
           body: JSON.stringify(body),
         }),
+
   deleteIrrigationPlan: (id: string) =>
-    request<void>(`/admin/irrigation-plans/${id}`, { method: 'DELETE' }),
-  projectPlans: () => request<ProjectPlan[]>('/admin/project-plans'),
-  saveProjectPlan: (body: Partial<ProjectPlan>, id?: string) =>
+    request<void>(`/admin/irrigation-plans/${id}`, {
+      method: 'DELETE',
+    }),
+
+  projectPlans: () =>
+    request<ProjectPlan[]>('/admin/project-plans'),
+
+  saveProjectPlan: (
+    body: Partial<ProjectPlan>,
+    id?: string
+  ) =>
     id
       ? request<ProjectPlan>(`/admin/project-plans/${id}`, {
           method: 'PUT',
@@ -146,10 +252,19 @@ export const api = {
           method: 'POST',
           body: JSON.stringify(body),
         }),
+
   deleteProjectPlan: (id: string) =>
-    request<void>(`/admin/project-plans/${id}`, { method: 'DELETE' }),
-  projects: () => request<ProjectCase[]>('/admin/projects'),
-  saveProject: (body: Partial<ProjectCase>, id?: string) =>
+    request<void>(`/admin/project-plans/${id}`, {
+      method: 'DELETE',
+    }),
+
+  projects: () =>
+    request<ProjectCase[]>('/admin/projects'),
+
+  saveProject: (
+    body: Partial<ProjectCase>,
+    id?: string
+  ) =>
     id
       ? request<ProjectCase>(`/admin/projects/${id}`, {
           method: 'PUT',
@@ -159,32 +274,70 @@ export const api = {
           method: 'POST',
           body: JSON.stringify(body),
         }),
-  deleteProject: (id: string) => request<void>(`/admin/projects/${id}`, { method: 'DELETE' }),
-  requests: () => request<ServiceRequest[]>('/admin/requests'),
+
+  deleteProject: (id: string) =>
+    request<void>(`/admin/projects/${id}`, {
+      method: 'DELETE',
+    }),
+
+  requests: () =>
+    request<ServiceRequest[]>('/admin/requests'),
+
   updateRequest: (id: string, status: string) =>
     request<ServiceRequest>(`/admin/requests/${id}`, {
       method: 'PATCH',
       body: JSON.stringify({ status }),
     }),
+
   convertQuote: (id: string, amount: number, notes?: string) =>
     request<Quotation>(`/admin/requests/${id}/convert-quote`, {
       method: 'POST',
       body: JSON.stringify({ amount, notes }),
     }),
-  quotations: () => request<Quotation[]>('/admin/quotations'),
+
+  quotations: () =>
+    request<Quotation[]>('/admin/quotations'),
+
   createQuotation: (body: Partial<Quotation>) =>
-    request<Quotation>('/admin/quotations', { method: 'POST', body: JSON.stringify(body) }),
-  updateQuotation: (id: string, body: Partial<Quotation>) =>
+    request<Quotation>('/admin/quotations', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateQuotation: (
+    id: string,
+    body: Partial<Quotation>
+  ) =>
     request<Quotation>(`/admin/quotations/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
     }),
-  siteContact: () => request<SiteContact>('/admin/site-contact'),
+
+  siteContact: () =>
+    request<SiteContact>('/admin/site-contact'),
+
   saveSiteContact: (body: Partial<SiteContact>) =>
     request<SiteContact>('/admin/site-contact', {
       method: 'PUT',
       body: JSON.stringify(body),
     }),
+
+  locale: (language: 'en' | 'te') =>
+    request<Record<string, unknown>>(
+      `/admin/locales/${language}`
+    ),
+
+  saveLocale: (
+    language: 'en' | 'te',
+    translations: Record<string, unknown>
+  ) =>
+    request<Record<string, unknown>>(
+      `/admin/locales/${language}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(translations),
+      }
+    ),
 }
 
 export type SiteContact = {
@@ -222,8 +375,17 @@ export type Order = {
   id: string
   mongoId: string
   createdAt: string
-  items: Array<{ name: string; quantity: number; price: number }>
-  address: { fullName: string; phone: string; city: string; state: string }
+  items: Array<{
+    name: string
+    quantity: number
+    price: number
+  }>
+  address: {
+    fullName: string
+    phone: string
+    city: string
+    state: string
+  }
   total: number
   status: string
   paymentMethod: string

@@ -2,19 +2,21 @@ import { NavLink, Outlet, Navigate } from 'react-router-dom'
 import { useAuth } from '../auth'
 
 const links = [
-  { to: '/', label: 'Dashboard', end: true },
-  { to: '/orders', label: 'Orders' },
-  { to: '/products', label: 'Products' },
-  { to: '/irrigation-plans', label: 'Irrigation Plans' },
-  { to: '/project-plans', label: 'Project Plans' },
-  { to: '/projects', label: 'Projects' },
-  { to: '/requests', label: 'Requests' },
-  { to: '/quotations', label: 'Quotations' },
-  { to: '/site-contact', label: 'Site contact' },
+  { to: '/', label: 'Dashboard', end: true, permission: 'dashboard' },
+  { to: '/orders', label: 'Orders', permission: 'orders' },
+  { to: '/products', label: 'Products', permission: 'catalog' },
+  { to: '/irrigation-plans', label: 'Irrigation Plans', permission: 'plans' },
+  { to: '/project-plans', label: 'Project Plans', permission: 'plans' },
+  { to: '/projects', label: 'Projects', permission: 'projects' },
+  { to: '/requests', label: 'Requests', permission: 'requests' },
+  { to: '/quotations', label: 'Quotations', permission: 'quotations' },
+  { to: '/site-contact', label: 'Site contact', permission: 'settings' },
+  { to: '/languages', label: 'Languages', permission: 'languages' },
+   { to: '/staff', label: 'Team & Access', permission: 'staff' },
 ]
 
 export function AdminLayout() {
-  const { token, username, logout } = useAuth()
+  const { token, username, role, permissions, logout } = useAuth()
   if (!token) return <Navigate to="/login" replace />
 
   return (
@@ -30,7 +32,7 @@ export function AdminLayout() {
           </p>
         </div>
         <nav className="flex flex-1 flex-col gap-1 px-3 pb-6">
-          {links.map((l) => (
+          {links.filter((l) => !l.permission || permissions.includes(l.permission)).map((l) => (
             <NavLink
               key={l.to}
               to={l.to}
@@ -58,7 +60,7 @@ export function AdminLayout() {
             </p>
           </div>
           <div className="flex items-center gap-3 text-sm">
-            <span className="rounded-full bg-mist px-3 py-1 font-medium text-forest">{username}</span>
+            <span className="rounded-full bg-mist px-3 py-1 font-medium text-forest">{username} · {role}</span>
             <button type="button" className="btn-outline" onClick={logout}>
               Logout
             </button>
@@ -66,7 +68,7 @@ export function AdminLayout() {
         </header>
 
         <div className="flex gap-2 overflow-x-auto border-b border-leaf/10 bg-white/70 px-3 py-2 md:hidden">
-          {links.map((l) => (
+          {links.filter((l) => !l.permission || permissions.includes(l.permission)).map((l) => (
             <NavLink
               key={l.to}
               to={l.to}
