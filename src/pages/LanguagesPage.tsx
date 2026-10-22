@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../lib/api'
-import defaultEnglish from '../../../dripgrow/src/i18n/locales/en.json'
-import defaultTelugu from '../../../dripgrow/src/i18n/locales/te.json'
 
 type Language = 'en' | 'te'
 
 const labels: Record<Language, string> = { en: 'English (en)', te: 'Telugu (te)' }
-const defaults: Record<Language, Record<string, unknown>> = { en: defaultEnglish, te: defaultTelugu }
+const defaults: Record<Language, Record<string, unknown>> = { en: {}, te: {} }
 
 export function LanguagesPage() {
   const [language, setLanguage] = useState<Language>('te')
@@ -65,7 +63,7 @@ export function LanguagesPage() {
       <p className="text-sm font-semibold uppercase tracking-[0.16em] text-leaf">Localization</p>
       <h1 className="mt-1 font-display text-4xl text-forest">Language files</h1>
       <p className="mt-3 max-w-2xl text-stone-600">
-        Download a language JSON file, edit its text values, then upload it to publish the changes. Use the same nested key structure; prices, IDs, and other business data are not part of these files.
+        Download the currently published language JSON file, edit its text values, then upload it to publish the changes. Use the same nested key structure; prices, IDs, and other business data are not part of these files.
       </p>
 
       <div className="mt-8 rounded-2xl border border-leaf/10 bg-white p-6 shadow-sm">
@@ -87,7 +85,7 @@ export function LanguagesPage() {
 
         {message && <p className="mt-5 rounded-lg bg-mist px-4 py-3 text-sm text-forest">{message}</p>}
         <p className="mt-6 text-xs text-stone-500">
-          {Object.keys(translations).length} top-level translation groups loaded. If no file has been published, the bundled default is shown and can be downloaded as a starting point.
+          {Object.keys(translations).length} top-level translation groups loaded. Publish an initial JSON language file before it is available for storefront visitors.
         </p>
       </div>
     </section>
