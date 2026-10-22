@@ -142,6 +142,18 @@ export type CreatedUser = {
   permissions: string[]
 }
 
+export type Account = {
+  id: string
+  type: 'STAFF' | 'CUSTOMER'
+  displayName: string
+  username?: string | null
+  email?: string | null
+  phone?: string | null
+  role: string
+  active: boolean
+  permissions: string[]
+}
+
 export const api = {
   login: (username: string, password: string) =>
     request<{
@@ -169,6 +181,16 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ active }),
     }),
+
+  accounts: () => request<Account[]>('/admin/accounts'),
+
+  updateAccount: (
+    account: Pick<Account, 'id' | 'type'>,
+    body: Partial<Pick<Account, 'displayName' | 'email' | 'phone' | 'role' | 'active'>>,
+  ) => request<Account>(`/admin/accounts/${account.type}/${account.id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  }),
 
   uploadImage,
 

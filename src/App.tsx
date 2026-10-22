@@ -32,6 +32,7 @@ export default function App() {
             <Route path="site-contact" element={<SiteContactPage />} />
             <Route path="languages" element={<LanguagesPage />} />
             <Route path="staff" element={<StaffPage />} />
+            <Route path="accounts" element={<StaffPage />} />
             <Route path="create-user" element={<Navigate to="/staff" replace />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

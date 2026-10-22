@@ -1,27 +1,89 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../auth'
-import { api, type CreatedUser } from '../lib/api'
+import { api, type Account, type CreateUserPayload } from '../lib/api'
 
-const roleHelp: Record<string, string> = {
-  OWNER: 'Full control, staff management, settings, and audit visibility.',
-  ADMIN: 'Catalog, plans, projects, orders, customer requests, and quotations.',
-  MAINTENANCE: 'Order fulfilment and service-request progress only.',
-  SERVICE: 'Customer requests and quotations only.',
-}
+const staffRoles = ['ADMIN', 'MAINTENANCE', 'SERVICE'] as const
 
 export function StaffPage() {
   const { role } = useAuth()
-  const [staff, setStaff] = useState<CreatedUser[]>([])
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [filter, setFilter] = useState<'ALL' | 'STAFF' | 'CUSTOMER'>('ALL')
+  const [selected, setSelected] = useState<Account | null>(null)
+  const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ displayName: '', username: '', email: '', password: '', role: 'SERVICE' })
-  const load = async () => { try { setStaff(await api.staff()) } catch (err) { setError(err instanceof Error ? err.message : 'Could not load staff accounts.') } }
+  const [createForm, setCreateForm] = useState<CreateUserPayload>({ displayName: '', username: '', email: '', password: '', role: 'SERVICE' })
+
+  const load = async () => {
+    try { setAccounts(await api.accounts()) }
+    catch (err) { setError(err instanceof Error ? err.message : 'Could not load accounts.') }
+  }
+
   useEffect(() => { void load() }, [])
+  const visibleAccounts = useMemo(() => filter === 'ALL' ? accounts : accounts.filter((account) => account.type === filter), [accounts, filter])
   if (role !== 'OWNER') return <Navigate to="/" replace />
-  async function create(e: React.FormEvent) { e.preventDefault(); setSaving(true); setError(''); try { const created = await api.createUser(form); setStaff((current) => [...current, created]); setForm({ displayName: '', username: '', email: '', password: '', role: 'SERVICE' }) } catch (err) { setError(err instanceof Error ? err.message : 'Could not create the staff account.') } finally { setSaving(false) } }
-  async function toggle(user: CreatedUser) { try { const updated = await api.setStaffActive(user.id, !user.active); setStaff((current) => current.map((item) => item.id === user.id ? updated : item)) } catch (err) { setError(err instanceof Error ? err.message : 'Could not update the account.') } }
-  return <div className="max-w-6xl"><p className="eyebrow">Owner controls</p><h1 className="font-display text-3xl text-forest">Team access and permissions</h1><p className="mt-2 max-w-3xl text-stone-600">Create staff accounts, choose a job role, and disable access immediately when someone no longer needs it. The permissions listed below are enforced by the API.</p><div className="mt-8 grid gap-8 xl:grid-cols-[380px_1fr]"><form className="card h-fit space-y-4" onSubmit={(e) => void create(e)}><div><h2 className="font-display text-2xl text-forest">Add staff account</h2><p className="mt-1 text-sm text-stone-600">Passwords must contain at least 8 characters.</p></div><Field label="Staff member name" value={form.displayName} onChange={(displayName) => setForm({ ...form, displayName })} /><Field label="Username" value={form.username} onChange={(username) => setForm({ ...form, username })} /><Field label="Work email" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} /><Field label="Temporary password" type="password" value={form.password} onChange={(password) => setForm({ ...form, password })} /><div><label className="label">Access role</label><select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>{Object.keys(roleHelp).filter((item) => item !== 'OWNER').map((item) => <option key={item} value={item}>{item[0] + item.slice(1).toLowerCase()}</option>)}</select><p className="mt-1 text-xs text-stone-500">{roleHelp[form.role]}</p></div>{error && <p className="text-sm font-medium text-red-700">{error}</p>}<button className="btn-primary w-full" disabled={saving}>{saving ? 'Creating account…' : 'Create staff account'}</button></form><section className="card overflow-hidden"><div className="border-b border-leaf/10 px-6 py-5"><h2 className="font-display text-2xl text-forest">All staff accounts</h2><p className="mt-1 text-sm text-stone-600">Owner-only view of every team login and its access level.</p></div><div className="overflow-x-auto"><table className="w-full min-w-[660px] text-left text-sm"><thead className="bg-mist/40 text-stone-600"><tr><th className="px-5 py-3">Staff member</th><th className="px-5 py-3">Role</th><th className="px-5 py-3">Allowed areas</th><th className="px-5 py-3">Access</th></tr></thead><tbody>{staff.map((user) => <tr key={user.id} className="border-t border-leaf/10"><td className="px-5 py-4"><strong>{user.displayName || user.username}</strong><span className="block text-xs text-stone-500">{user.username} · {user.email || 'No email provided'}</span></td><td className="px-5 py-4"><span className="rounded-full bg-mist px-3 py-1 text-xs font-bold text-forest">{user.role}</span></td><td className="px-5 py-4 text-xs text-stone-600">{user.permissions.join(', ')}</td><td className="px-5 py-4"><button type="button" onClick={() => void toggle(user)} className={user.active ? 'btn-outline !px-3 !py-1.5 text-xs' : 'btn-primary !px-3 !py-1.5 text-xs'}>{user.active ? 'Disable access' : 'Enable access'}</button></td></tr>)}</tbody></table></div></section></div></div>
+
+  async function createStaff(event: React.FormEvent) {
+    event.preventDefault(); setError(''); setNotice('')
+    try {
+      const created = await api.createUser(createForm)
+      setAccounts((current) => [...current, { ...created, type: 'STAFF', phone: null }])
+      setCreateForm({ displayName: '', username: '', email: '', password: '', role: 'SERVICE' })
+      setNotice('Staff account created and ready to sign in.')
+    } catch (err) { setError(err instanceof Error ? err.message : 'Could not create the staff account.') }
+  }
+
+  async function saveAccount(event: React.FormEvent) {
+    event.preventDefault(); if (!selected) return
+    setError(''); setNotice('')
+    try {
+      const updated = await api.updateAccount(selected, selected)
+      setAccounts((current) => current.map((account) => account.id === updated.id && account.type === updated.type ? updated : account))
+      setSelected(updated); setNotice('Account details saved.')
+    } catch (err) { setError(err instanceof Error ? err.message : 'Could not save account details.') }
+  }
+
+  async function changeStatus(account: Account) {
+    try {
+      const updated = await api.updateAccount(account, { active: !account.active })
+      setAccounts((current) => current.map((item) => item.id === updated.id && item.type === updated.type ? updated : item))
+      if (selected?.id === updated.id && selected.type === updated.type) setSelected(updated)
+      setNotice(`${updated.displayName} is now ${updated.active ? 'Active' : 'Suspended'}.`)
+    } catch (err) { setError(err instanceof Error ? err.message : 'Could not update account status.') }
+  }
+
+  return (
+    <div className="page-container">
+      <div className="page-header"><div><p className="eyebrow">Owner controls</p><h1 className="page-title">Accounts and access</h1><p className="page-sub">View every customer and staff account, edit contact details and roles, and control who can sign in.</p></div></div>
+      {(notice || error) && <p className={error ? 'rounded-xl bg-red-50 p-3 text-sm text-red-700' : 'rounded-xl bg-mist p-3 text-sm font-medium text-forest'}>{error || notice}</p>}
+      <div className="mt-6 grid gap-6 xl:grid-cols-[360px_1fr]">
+        <form className="card space-y-4" onSubmit={(event) => void createStaff(event)}>
+          <div><h2 className="section-title">Create staff account</h2><p className="section-subtitle">Staff accounts use the role-based access rules set by the owner.</p></div>
+          <TextField label="Staff name" value={createForm.displayName} onChange={(displayName) => setCreateForm({ ...createForm, displayName })} />
+          <TextField label="Username" value={createForm.username} onChange={(username) => setCreateForm({ ...createForm, username })} />
+          <TextField label="Work email" type="email" value={createForm.email} onChange={(email) => setCreateForm({ ...createForm, email })} />
+          <TextField label="Temporary password" type="password" value={createForm.password} onChange={(password) => setCreateForm({ ...createForm, password })} />
+          <RoleSelect value={createForm.role} onChange={(role) => setCreateForm({ ...createForm, role })} />
+          <button className="btn-primary w-full">Create staff account</button>
+        </form>
+        <section className="card">
+          <div className="card-header"><div><h2 className="section-title">All accounts</h2><p className="section-subtitle">{accounts.length} accounts across customers and your internal team.</p></div><div className="flex flex-wrap gap-2">{(['ALL', 'STAFF', 'CUSTOMER'] as const).map((item) => <button key={item} type="button" className={filter === item ? 'btn-primary !min-h-0 !px-3 !py-2 text-xs' : 'btn-outline !min-h-0 !px-3 !py-2 text-xs'} onClick={() => setFilter(item)}>{item === 'ALL' ? 'All' : item[0] + item.slice(1).toLowerCase()}</button>)}</div></div>
+          <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">{visibleAccounts.map((account) => <AccountCard key={`${account.type}-${account.id}`} account={account} onEdit={setSelected} onStatus={changeStatus} />)}</div>
+        </section>
+      </div>
+      {selected && <EditAccount account={selected} onChange={setSelected} onClose={() => setSelected(null)} onSave={saveAccount} />}
+    </div>
+  )
 }
 
-function Field({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; type?: string }) { return <div><label className="label">{label}</label><input required minLength={type === 'password' ? 8 : undefined} className="input" type={type} value={value} onChange={(e) => onChange(e.target.value)} /></div> }
+function AccountCard({ account, onEdit, onStatus }: { account: Account; onEdit: (account: Account) => void; onStatus: (account: Account) => void }) {
+  return <article className="rounded-2xl border border-leaf/10 bg-white p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-soil">{account.displayName || account.username}</p><p className="mt-1 text-xs text-stone-500">{account.type === 'CUSTOMER' ? account.phone : account.username}</p></div><Status active={account.active} /></div><p className="mt-3 text-xs font-semibold uppercase tracking-wide text-leaf">{account.type === 'STAFF' ? account.role : 'Customer'}</p><p className="mt-2 min-h-10 text-xs text-stone-600">{account.email || 'No email on file'}</p><div className="mt-4 flex gap-2"><button type="button" className="btn-outline flex-1 !min-h-0 !px-3 !py-2 text-xs" onClick={() => onEdit(account)}>Edit details</button><button type="button" className={account.active ? 'btn-danger !min-h-0 !px-3 !py-2 text-xs' : 'btn-primary !min-h-0 !px-3 !py-2 text-xs'} onClick={() => void onStatus(account)}>{account.active ? 'Suspend' : 'Activate'}</button></div></article>
+}
+
+function EditAccount({ account, onChange, onClose, onSave }: { account: Account; onChange: (account: Account) => void; onClose: () => void; onSave: (event: React.FormEvent) => Promise<void> }) {
+  return <div className="dialog-backdrop" role="presentation"><form className="dialog-panel" onSubmit={(event) => void onSave(event)}><div className="card-header"><div><h2 className="section-title">Edit {account.type === 'STAFF' ? 'staff' : 'customer'} account</h2><p className="section-subtitle">Account status changes apply immediately.</p></div><button type="button" className="btn-icon" aria-label="Close" onClick={onClose}>×</button></div><div className="form-grid"><TextField label="Full name" value={account.displayName} onChange={(displayName) => onChange({ ...account, displayName })} /><TextField label="Email" type="email" value={account.email ?? ''} onChange={(email) => onChange({ ...account, email })} />{account.type === 'CUSTOMER' ? <TextField label="Mobile number" value={account.phone ?? ''} onChange={(phone) => onChange({ ...account, phone })} /> : <RoleSelect value={account.role} onChange={(role) => onChange({ ...account, role })} />}</div><div className="dialog-footer"><button type="button" className="btn-outline" onClick={onClose}>Cancel</button><button className="btn-primary">Save account details</button></div></form></div>
+}
+
+function TextField({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; type?: string }) { return <div className="form-group"><label className="label">{label}</label><input required className="input" type={type} minLength={type === 'password' ? 8 : undefined} value={value} onChange={(event) => onChange(event.target.value)} /></div> }
+function RoleSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) { return <div className="form-group"><label className="label">Role and access</label><select className="input" value={value} onChange={(event) => onChange(event.target.value)}>{staffRoles.map((role) => <option key={role}>{role}</option>)}</select></div> }
+function Status({ active }: { active: boolean }) { return <span className={active ? 'rounded-full bg-mist px-2 py-1 text-xs font-bold text-forest' : 'rounded-full bg-red-50 px-2 py-1 text-xs font-bold text-red-700'}>{active ? 'Active' : 'Suspended'}</span> }
