@@ -155,6 +155,17 @@ export type Account = {
 }
 
 export const api = {
+  passwordRecovery: (username: string, email: string) =>
+    request<{ id: string; status: string }>('/requests', {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 'PASSWORD_RESET',
+        name: username,
+        email,
+        message: 'Password recovery request for admin account. Verify account ownership before resetting the password.',
+        details: { accountType: 'admin', username },
+      }),
+    }),
   login: (username: string, password: string) =>
     request<{
       token: string

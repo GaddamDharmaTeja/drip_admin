@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth'
+import { api } from '../lib/api'
 
 export function Login() {
   const { token, login } = useAuth()
@@ -9,6 +10,9 @@ export function Login() {
   const [password, setPassword] = useState('Admin@123')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [recoveryOpen, setRecoveryOpen] = useState(false)
+  const [recoveryEmail, setRecoveryEmail] = useState('')
+  const [recoveryMessage, setRecoveryMessage] = useState('')
 
   if (token) return <Navigate to="/" replace />
 
@@ -24,6 +28,15 @@ export function Login() {
     } finally {
       setLoading(false)
     }
+  }
+
+  async function submitRecovery(e: FormEvent) {
+    e.preventDefault()
+    if (!username.trim() || !recoveryEmail.trim()) { setRecoveryMessage('Enter your admin username and registered email address.'); return }
+    try {
+      await api.passwordRecovery(username.trim(), recoveryEmail.trim())
+      setRecoveryMessage('Recovery request sent. The account owner will verify your identity before resetting access.')
+    } catch (err) { setRecoveryMessage(err instanceof Error ? err.message : 'Could not submit your recovery request.') }
   }
 
   return (
@@ -54,8 +67,12 @@ export function Login() {
           <button type="submit" className="btn-primary w-full" disabled={loading}>
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
+          <button type="button" className="w-full text-center text-sm font-semibold text-leaf hover:text-forest" onClick={() => { setRecoveryOpen(true); setRecoveryMessage('') }}>
+            Forgot password?
+          </button>
         </div>
       </form>
+      {recoveryOpen && <div className="dialog-backdrop"><form className="dialog-panel" onSubmit={(event) => void submitRecovery(event)}><div className="dialog-header"><div><p className="text-xs font-semibold uppercase tracking-wide text-leaf">Admin recovery</p><h2 className="mt-1 font-display text-2xl text-forest">Recover admin access</h2></div><button type="button" className="text-2xl text-stone-400" onClick={() => setRecoveryOpen(false)}>×</button></div><p className="text-sm text-stone-600">Submit a support request. A reset code is not sent automatically; the owner verifies access first.</p><div className="mt-5 space-y-4"><div><label className="label">Admin username</label><input required className="input" value={username} onChange={(event) => setUsername(event.target.value)} /></div><div><label className="label">Registered email address</label><input required className="input" type="email" value={recoveryEmail} onChange={(event) => setRecoveryEmail(event.target.value)} /></div>{recoveryMessage && <p className="rounded-lg bg-mist px-3 py-2 text-sm text-forest">{recoveryMessage}</p>}<button className="btn-primary w-full">Send recovery request</button></div></form></div>}
     </div>
   )
 }

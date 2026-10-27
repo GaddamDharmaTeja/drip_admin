@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ImageUploader } from '../components/ImageUploader'
 import { api, fileUrl, inr, type Product } from '../lib/api'
 
@@ -27,6 +27,8 @@ export function ProductsPage() {
   const [form, setForm] = useState<Partial<Product>>(empty)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [query, setQuery] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('')
 
   async function load() {
     setItems(await api.products())
@@ -35,6 +37,7 @@ export function ProductsPage() {
   useEffect(() => {
     void load().catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed'))
   }, [])
+  const visibleItems = useMemo(() => items.filter((item) => (!query || `${item.name} ${item.brand}`.toLowerCase().includes(query.toLowerCase())) && (!categoryFilter || item.category === categoryFilter)), [items, query, categoryFilter])
 
   async function save() {
     try {
@@ -59,9 +62,9 @@ export function ProductsPage() {
   return (
     <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
       <div>
-        <h1 className="page-title">Products</h1>
-        <p className="page-sub">Upload product photos into MongoDB GridFS, then save the catalog record.</p>
+        <div className="page-header"><div><h1 className="page-title">Products</h1><p className="page-sub">Manage your irrigation catalog, product media, pricing, and availability.</p></div><button type="button" className="btn-primary" onClick={() => { setEditingId(null); setForm(empty); document.getElementById('product-form')?.scrollIntoView({ behavior: 'smooth' }) }}>+ Add product</button></div>
         {error && <p className="mt-2 text-red-600">{error}</p>}
+        <div className="mt-5 flex flex-wrap gap-3"><input className="input max-w-sm" placeholder="Search products…" value={query} onChange={(event) => setQuery(event.target.value)} /><select className="input w-auto" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option value="">All categories</option>{[...new Set(items.map((item) => item.category))].map((category) => <option key={category} value={category}>{category}</option>)}</select></div>
         <div className="table-wrap mt-6">
           <table className="w-full min-w-[680px] text-left text-sm">
             <thead className="bg-mist/60 text-stone-600">
@@ -73,7 +76,7 @@ export function ProductsPage() {
               </tr>
             </thead>
             <tbody>
-              {items.map((p) => (
+              {visibleItems.map((p) => (
                 <tr key={p.id} className="border-t border-leaf/5">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -116,7 +119,7 @@ export function ProductsPage() {
         </div>
       </div>
 
-      <form
+      <form id="product-form"
         className="card h-fit space-y-3"
         onSubmit={(e) => {
           e.preventDefault()
